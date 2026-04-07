@@ -1,0 +1,78 @@
+stages:
+  download_data:
+    cmd: python src/data/download_dataset.py --output-dir data/raw --params params.yaml
+    deps:
+      - src/data/download_dataset.py
+      - params.yaml
+    params:
+      - data.dataset_name
+      - data.tomato_keyword
+      - data.healthy_label
+    outs:
+      - data/raw
+
+  prepare_data:
+    cmd: >
+      python src/data/prepare_dataset.py
+      --raw-dir data/raw
+      --processed-dir data/processed
+      --params params.yaml
+    deps:
+      - src/data/prepare_dataset.py
+      - data/raw
+      - params.yaml
+    params:
+      - data.seed
+      - data.train_ratio
+      - data.val_ratio
+      - data.image_size
+      - features.extractor
+      - features.normalize
+    outs:
+      - data/processed
+
+  train_models:
+    cmd: >
+      python src/training/train.py
+      --processed-dir data/processed
+      --output-dir models
+      --params params.yaml
+    deps:
+      - src/training/train.py
+      - data/processed
+      - params.yaml
+    params:
+      - optuna
+      - logistic_regression
+      - random_forest
+      - xgboost
+      - mlflow.experiment_name
+      - data.seed
+    outs:
+      - models/logisticregression
+      - models/randomforest
+      - models/xgboost
+      - models/training_summary.json
+
+  evaluate:
+    cmd: >
+      python src/training/evaluate.py
+      --models-dir models
+      --processed-dir data/processed
+      --raw-dir data/raw
+      --output-dir models/evaluation
+      --params params.yaml
+    deps:
+      - src/training/evaluate.py
+      - models/logisticregression
+      - models/randomforest
+      - models/xgboost
+      - data/processed
+      - data/raw
+      - params.yaml
+    outs:
+      - models/champion
+      - models/evaluation
+
+metrics:
+  - models/evaluation/test_metrics.json
