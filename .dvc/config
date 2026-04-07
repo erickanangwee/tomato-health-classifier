@@ -1,0 +1,4 @@
+[core]
+    remote = localremote
+['remote "localremote"']
+    url = C:/Users/erick/AppData/Local/Temp/dvc-remote
