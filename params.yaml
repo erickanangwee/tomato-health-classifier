@@ -1,0 +1,77 @@
+# ─────────────────────────────────────────────
+# Data
+# ─────────────────────────────────────────────
+data:
+  dataset_name: "agyaatcoder/PlantDoc"
+  tomato_keyword: "Tomato"
+  # Label used in the dataset for healthy leaves
+  healthy_label: "Tomato leaf"
+  seed: 42
+  train_ratio: 0.70
+  val_ratio: 0.15
+  # test_ratio is implicit: 1 - train - val = 0.15
+  image_size: 224 # pixels for MobileNetV2 embedding
+
+# ─────────────────────────────────────────────
+# Feature extraction
+# ─────────────────────────────────────────────
+features:
+  # "mobilenet" uses MobileNetV2 penultimate layer (1280-dim)
+  # "hog" uses Histogram of Oriented Gradients (faster, less accurate)
+  extractor: "mobilenet"
+  normalize: true
+
+# ─────────────────────────────────────────────
+# Optuna hyperparameter search
+# ─────────────────────────────────────────────
+optuna:
+  n_trials: 30 # trials per model — increase for better tuning
+  timeout: 600 # seconds per model (10 min cap)
+  direction: "maximize"
+  metric: "f1_weighted"
+  cv_folds: 3
+
+# ─────────────────────────────────────────────
+# Model-specific search spaces
+# ─────────────────────────────────────────────
+logistic_regression:
+  C_low: 0.001
+  C_high: 100.0
+  solver: ["lbfgs", "liblinear"]
+  max_iter: 1000
+
+random_forest:
+  n_estimators_low: 50
+  n_estimators_high: 300
+  max_depth_low: 3
+  max_depth_high: 20
+  min_samples_split_low: 2
+  min_samples_split_high: 10
+
+xgboost:
+  n_estimators_low: 50
+  n_estimators_high: 300
+  max_depth_low: 3
+  max_depth_high: 10
+  learning_rate_low: 0.01
+  learning_rate_high: 0.3
+  subsample_low: 0.6
+  subsample_high: 1.0
+
+# ─────────────────────────────────────────────
+# MLflow
+# ─────────────────────────────────────────────
+mlflow:
+  experiment_name: "tomato-health-classification"
+  model_name: "tomato-health-classifier"
+  tracking_uri: "http://localhost:5000"
+
+# ─────────────────────────────────────────────
+# Tomato guard (non-tomato rejection)
+# ─────────────────────────────────────────────
+tomato_guard:
+  # Cosine similarity threshold vs mean tomato training embedding
+  # Images scoring below this are rejected as non-tomato
+  similarity_threshold: 0.65
+  # Path written at training time, read at inference time
+  centroid_path: "models/champion/tomato_centroid.npy"
