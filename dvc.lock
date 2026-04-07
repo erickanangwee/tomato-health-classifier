@@ -1,0 +1,174 @@
+schema: '2.0'
+stages:
+  download_data:
+    cmd: python src/data/download_dataset.py --output-dir data/raw --params 
+      params.yaml
+    deps:
+    - path: params.yaml
+      hash: md5
+      md5: f7ca4429d34415d9aeb1e6d208e2fa83
+      size: 3422
+    - path: src/data/download_dataset.py
+      hash: md5
+      md5: fc02a4d6e6d8d2aa3017fb7a09f730b7
+      size: 4209
+    params:
+      params.yaml:
+        data.dataset_name: agyaatcoder/PlantDoc
+        data.healthy_label: Tomato leaf
+        data.tomato_keyword: Tomato
+    outs:
+    - path: data/raw
+      hash: md5
+      md5: 1fa07fc84f348ba264c798f49bd749c7.dir
+      size: 240857537
+      nfiles: 678
+  prepare_data:
+    cmd: "python src/data/prepare_dataset.py --raw-dir data/raw --processed-dir data/processed
+      --params params.yaml\n"
+    deps:
+    - path: data/raw
+      hash: md5
+      md5: 1fa07fc84f348ba264c798f49bd749c7.dir
+      size: 240857537
+      nfiles: 678
+    - path: params.yaml
+      hash: md5
+      md5: f7ca4429d34415d9aeb1e6d208e2fa83
+      size: 3422
+    - path: src/data/prepare_dataset.py
+      hash: md5
+      md5: 99326af2cf45b2d0c8089d4a3f622eac
+      size: 6487
+    params:
+      params.yaml:
+        data.image_size: 224
+        data.seed: 42
+        data.train_ratio: 0.7
+        data.val_ratio: 0.15
+        features.extractor: mobilenet
+        features.normalize: true
+    outs:
+    - path: data/processed
+      hash: md5
+      md5: 624b15dc2a6d366ddcf3287e72e43e0d.dir
+      size: 3503938
+      nfiles: 8
+  train_models:
+    cmd: "python src/training/train.py --processed-dir data/processed --output-dir
+      models --params params.yaml\n"
+    deps:
+    - path: data/processed
+      hash: md5
+      md5: 624b15dc2a6d366ddcf3287e72e43e0d.dir
+      size: 3503938
+      nfiles: 8
+    - path: params.yaml
+      hash: md5
+      md5: f7ca4429d34415d9aeb1e6d208e2fa83
+      size: 3422
+    - path: src/training/train.py
+      hash: md5
+      md5: e5de82bbad063fcc0198216a8fa94141
+      size: 11844
+    params:
+      params.yaml:
+        data.seed: 42
+        logistic_regression:
+          C_low: 0.001
+          C_high: 100.0
+          solver:
+          - lbfgs
+          - liblinear
+          max_iter: 1000
+        mlflow.experiment_name: tomato-health-classification
+        optuna:
+          n_trials: 30
+          timeout: 600
+          direction: maximize
+          metric: f1_weighted
+          cv_folds: 3
+        random_forest:
+          n_estimators_low: 50
+          n_estimators_high: 300
+          max_depth_low: 3
+          max_depth_high: 20
+          min_samples_split_low: 2
+          min_samples_split_high: 10
+        xgboost:
+          n_estimators_low: 50
+          n_estimators_high: 300
+          max_depth_low: 3
+          max_depth_high: 10
+          learning_rate_low: 0.01
+          learning_rate_high: 0.3
+          subsample_low: 0.6
+          subsample_high: 1.0
+    outs:
+    - path: models/logisticregression
+      hash: md5
+      md5: 57bb4d7d288a1326c51c1326676c0046.dir
+      size: 11426
+      nfiles: 2
+    - path: models/randomforest
+      hash: md5
+      md5: 16edc7e341a6bf06b9fa658fbe5c4dc5.dir
+      size: 339701
+      nfiles: 2
+    - path: models/training_summary.json
+      hash: md5
+      md5: 2f0aae3a800f9d73d1794f9acfb22551
+      size: 1291
+    - path: models/xgboost
+      hash: md5
+      md5: ad2c60206516b95a4a7f08b573fa183c.dir
+      size: 72584
+      nfiles: 2
+  evaluate:
+    cmd: "python src/training/evaluate.py --models-dir models --processed-dir data/processed
+      --raw-dir data/raw --output-dir models/evaluation --params params.yaml\n"
+    deps:
+    - path: data/processed
+      hash: md5
+      md5: 624b15dc2a6d366ddcf3287e72e43e0d.dir
+      size: 3503938
+      nfiles: 8
+    - path: data/raw
+      hash: md5
+      md5: 1fa07fc84f348ba264c798f49bd749c7.dir
+      size: 240857537
+      nfiles: 678
+    - path: models/logisticregression
+      hash: md5
+      md5: 57bb4d7d288a1326c51c1326676c0046.dir
+      size: 11426
+      nfiles: 2
+    - path: models/randomforest
+      hash: md5
+      md5: 16edc7e341a6bf06b9fa658fbe5c4dc5.dir
+      size: 339701
+      nfiles: 2
+    - path: models/xgboost
+      hash: md5
+      md5: ad2c60206516b95a4a7f08b573fa183c.dir
+      size: 72584
+      nfiles: 2
+    - path: params.yaml
+      hash: md5
+      md5: f7ca4429d34415d9aeb1e6d208e2fa83
+      size: 3422
+    - path: src/training/evaluate.py
+      hash: md5
+      md5: f0557663a9a683a00dec347de9fdd42a
+      size: 7480
+    outs:
+    - path: models/champion
+      hash: md5
+      md5: d2972a3bc33e3f4ec15863fd4a54b206.dir
+      size: 108970
+      nfiles: 4
+    - path: models/evaluation
+      hash: md5
+      md5: 25b515362953898bbface0385306f6e6.dir
+      size: 3622
+      nfiles: 2
