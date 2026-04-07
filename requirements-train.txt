@@ -1,0 +1,33 @@
+# Data
+datasets>=2.18.0
+Pillow>=10.0.0
+
+# Features
+scikit-learn>=1.4.0
+numpy>=1.24.0
+pandas>=2.0.0
+scipy>=1.11.0
+
+# Deep feature extraction (MobileNetV2 embeddings)
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Models
+xgboost>=2.0.0
+joblib>=1.3.0
+
+# Hyperparameter tuning
+optuna>=3.6.0
+optuna-integration[mlflow]>=3.6.0
+
+# Experiment tracking
+mlflow>=2.12.0
+
+# Pipeline
+dvc>=3.49.0
+PyYAML>=6.0
+
+# Utilities
+tqdm>=4.66.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
