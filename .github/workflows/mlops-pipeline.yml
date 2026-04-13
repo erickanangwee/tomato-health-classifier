@@ -1,0 +1,236 @@
+name: MLOps CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: # manual trigger
+
+env:
+  PYTHON_VERSION: "3.10"
+  IMAGE_NAME: tomato-health-api
+  MLFLOW_TRACKING_URI: "sqlite:///mlruns.db" # file-based tracking in CI
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────
+  # JOB 1 — Lint and unit tests
+  # ─────────────────────────────────────────────────────────────────
+  lint-and-test:
+    name: Lint & Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install lint + test deps
+        run: |
+          pip install --upgrade pip
+          pip install flake8 pytest httpx
+          # Minimal API deps only — no torch for speed
+          pip install fastapi uvicorn pydantic python-multipart
+
+      - name: Lint with flake8
+        run: |
+          flake8 src/ api/ tests/ \
+            --max-line-length=100 \
+            --ignore=E501,W503,E402 \
+            --exclude=__pycache__
+
+      - name: Import and schema check
+        run: |
+          python -c "from api.schemas import PredictionResponse, HealthResponse; print('Schemas OK')"
+
+      - name: Run unit tests (mocked)
+        run: pytest tests/ -v --tb=short
+
+  # ─────────────────────────────────────────────────────────────────
+  # JOB 2 — Run DVC training pipeline
+  # ─────────────────────────────────────────────────────────────────
+  train:
+    name: DVC Training Pipeline
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install training dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements-train.txt
+
+      - name: Configure DVC remote (CI uses local /tmp remote)
+        run: |
+          dvc remote add -d ci-remote /tmp/dvc-ci-cache
+          dvc remote modify ci-remote url /tmp/dvc-ci-cache
+
+      - name: Pull cached DVC artifacts (if available)
+        run: dvc pull --run-cache || echo "No cache available — running fresh"
+
+      - name: Override MLflow tracking URI for CI
+        run: |
+          # Use a local SQLite file instead of a server in CI
+          sed -i 's|http://localhost:5000|sqlite:///mlruns.db|g' params.yaml
+
+      - name: Run full DVC pipeline
+        run: dvc repro
+
+      - name: Push DVC artifacts to remote cache
+        run: dvc push || echo "DVC push skipped (no persistent remote in CI)"
+
+      - name: Upload champion model as GitHub artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: champion-model-${{ github.sha }}
+          path: |
+            models/champion/
+            models/evaluation/
+          retention-days: 30
+
+      - name: Print evaluation summary
+        run: |
+          echo "## 📊 Model Evaluation Results" >> $GITHUB_STEP_SUMMARY
+          echo '```json' >> $GITHUB_STEP_SUMMARY
+          cat models/champion/champion_info.json >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  # ─────────────────────────────────────────────────────────────────
+  # JOB 3 — Build and push Docker image
+  # ─────────────────────────────────────────────────────────────────
+  build-and-push:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: train
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download champion model
+        uses: actions/download-artifact@v4
+        with:
+          name: champion-model-${{ github.sha }}
+          path: models/
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable=true
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Output image digest
+        run: echo "Pushed image digest ${{ steps.build.outputs.digest }}"
+
+  # ─────────────────────────────────────────────────────────────────
+  # JOB 4 — Smoke test the pushed Docker image
+  # ─────────────────────────────────────────────────────────────────
+  smoke-test:
+    name: Docker Smoke Test
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Pull and start container
+        run: |
+          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+          docker run -d --name tomato-api -p 8000:8000 \
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: Wait for API to be ready
+        run: |
+          echo "Waiting for API to initialize (up to 120s)..."
+          for i in $(seq 1 24); do
+            if curl -sf http://localhost:8000/health > /dev/null; then
+              echo "API is ready after $((i*5))s"
+              break
+            fi
+            echo "  Attempt $i/24 — not ready yet"
+            sleep 5
+          done
+
+      - name: Smoke test — health endpoint
+        run: |
+          RESP=$(curl -sf http://localhost:8000/health)
+          echo "Health response: $RESP"
+          echo "$RESP" | python3 -c "
+          import json, sys
+          r = json.load(sys.stdin)
+          assert r['status'] == 'ok', f'Expected ok, got {r[\"status\"]}'
+          assert r['model_loaded'] == True
+          print('Health check PASSED')
+          "
+
+      - name: Smoke test — classes endpoint
+        run: |
+          curl -sf http://localhost:8000/classes | python3 -c "
+          import json, sys
+          r = json.load(sys.stdin)
+          assert 'HEALTHY' in r['classes']
+          assert 'UNHEALTHY' in r['classes']
+          print('Classes endpoint PASSED')
+          "
+
+      - name: Smoke test — predict endpoint
+        run: |
+          # Download a sample tomato image
+          curl -sL "https://upload.wikimedia.org/wikipedia/commons/thumb/8/88/Tomato_je.jpg/320px-Tomato_je.jpg" \
+            -o /tmp/test_tomato.jpg
+
+          RESP=$(curl -sf -X POST http://localhost:8000/predict \
+            -F "file=@/tmp/test_tomato.jpg" || echo '{"error": "request_failed"}')
+          echo "Predict response: $RESP"
+
+          # Accept either a prediction OR a rejection (422 from tomato guard)
+          # Both are valid behavior — the API is running correctly either way
+          echo "$RESP" | python3 -c "
+          import json, sys
+          r = json.load(sys.stdin)
+          assert 'error' not in r or r.get('error') != 'request_failed', \
+              'Predict endpoint completely failed'
+          print('Predict endpoint PASSED')
+          "
+
+      - name: Cleanup container
+        if: always()
+        run: docker stop tomato-api && docker rm tomato-api || true
