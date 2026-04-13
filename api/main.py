@@ -8,9 +8,7 @@ Endpoints:
   GET  /docs         — auto-generated Swagger UI
 """
 import io
-import json
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 import numpy as np
 import torch
@@ -23,15 +21,15 @@ from PIL import Image
 
 from api.model_loader import get_model, get_scaler
 from api.schemas import (ClassesResponse, HealthResponse,
-                          PredictionResponse, RejectionResponse)
+                         PredictionResponse, RejectionResponse)
 from api.tomato_guard import TomatoGuard
 
 SUPPORTED_TYPES = {"image/jpeg", "image/png", "image/webp", "image/jpg"}
-LABEL_NAMES     = {0: "HEALTHY", 1: "UNHEALTHY"}
+LABEL_NAMES = {0: "HEALTHY", 1: "UNHEALTHY"}
 
 _guard: TomatoGuard | None = None
 _embedder_transform = None
-_embedder_model     = None
+_embedder_model = None
 
 
 def load_params(path="params.yaml"):
@@ -97,7 +95,7 @@ def health():
     try:
         model = get_model()
         loaded = model is not None
-        mtype  = type(model).__name__ if loaded else None
+        mtype = type(model).__name__ if loaded else None
     except Exception:
         loaded, mtype = False, None
     return HealthResponse(
@@ -142,30 +140,30 @@ async def predict(file: UploadFile = File(...)):
         raise HTTPException(
             status_code=422,
             detail={
-                "filename":          file.filename,
-                "rejected":          True,
-                "reason":            (
+                "filename": file.filename,
+                "rejected": True,
+                "reason": (
                     f"Image does not appear to be a tomato leaf "
                     f"(similarity={similarity:.3f}, "
                     f"threshold={_guard.threshold:.3f}). "
                     "Please upload a clear photo of a tomato leaf."
                 ),
                 "tomato_similarity": round(similarity, 4),
-                "threshold_used":    _guard.threshold,
+                "threshold_used": _guard.threshold,
             },
         )
 
     # ── Feature extraction ───────────────────────────────────────────────────
     features = extract_features(image)
-    scaler   = get_scaler()
+    scaler = get_scaler()
     if scaler is not None:
         features = scaler.transform(features)
 
     # ── Prediction ───────────────────────────────────────────────────────────
-    model      = get_model()
-    pred_int   = int(model.predict(features)[0])
+    model = get_model()
+    pred_int = int(model.predict(features)[0])
     pred_label = LABEL_NAMES[pred_int]
-    probas     = model.predict_proba(features)[0]
+    probas = model.predict_proba(features)[0]
     confidence = float(probas[pred_int])
 
     return PredictionResponse(

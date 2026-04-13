@@ -71,9 +71,9 @@ def build_hog_extractor(img_size: int):
 
 
 def prepare(raw_dir: str, processed_dir: str, params_path: str = "params.yaml"):
-    p   = load_params(params_path)
-    dp  = p["data"]
-    fp  = p["features"]
+    p = load_params(params_path)
+    dp = p["data"]
+    fp = p["features"]
     raw = Path(raw_dir)
     out = Path(processed_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -82,8 +82,8 @@ def prepare(raw_dir: str, processed_dir: str, params_path: str = "params.yaml"):
         meta = json.load(f)
 
     samples = meta["samples"]
-    fnames  = sorted(samples.keys())
-    labels  = np.array([samples[fn]["label"] for fn in fnames])
+    fnames = sorted(samples.keys())
+    labels = np.array([samples[fn]["label"] for fn in fnames])
 
     # ── Build extractor ─────────────────────────────────────────────────────
     extractor_type = fp["extractor"]
@@ -103,10 +103,10 @@ def prepare(raw_dir: str, processed_dir: str, params_path: str = "params.yaml"):
     print(f"Feature matrix shape: {X.shape}")
 
     # ── Stratified splits ───────────────────────────────────────────────────
-    seed       = dp["seed"]
-    train_r    = dp["train_ratio"]
-    val_r      = dp["val_ratio"]
-    test_r     = round(1.0 - train_r - val_r, 4)
+    seed = dp["seed"]
+    train_r = dp["train_ratio"]
+    val_r = dp["val_ratio"]
+    test_r = round(1.0 - train_r - val_r, 4)
 
     X_train, X_tmp, y_train, y_tmp = train_test_split(
         X, labels,
@@ -126,8 +126,8 @@ def prepare(raw_dir: str, processed_dir: str, params_path: str = "params.yaml"):
     if fp["normalize"]:
         scaler = StandardScaler()
         X_train = scaler.fit_transform(X_train)
-        X_val   = scaler.transform(X_val)
-        X_test  = scaler.transform(X_test)
+        X_val = scaler.transform(X_val)
+        X_test = scaler.transform(X_test)
         joblib.dump(scaler, out / "scaler.joblib")
         print("Scaler fitted on training set and saved.")
     else:
@@ -136,35 +136,35 @@ def prepare(raw_dir: str, processed_dir: str, params_path: str = "params.yaml"):
     # ── Save arrays ─────────────────────────────────────────────────────────
     np.save(out / "X_train.npy", X_train)
     np.save(out / "y_train.npy", y_train)
-    np.save(out / "X_val.npy",   X_val)
-    np.save(out / "y_val.npy",   y_val)
-    np.save(out / "X_test.npy",  X_test)
-    np.save(out / "y_test.npy",  y_test)
+    np.save(out / "X_val.npy", X_val)
+    np.save(out / "y_val.npy", y_val)
+    np.save(out / "X_test.npy", X_test)
+    np.save(out / "y_test.npy", y_test)
 
     stats = {
-        "extractor":     extractor_type,
-        "feature_dim":   int(X.shape[1]),
+        "extractor": extractor_type,
+        "feature_dim": int(X.shape[1]),
         "total_samples": int(len(X)),
-        "train":         int(len(X_train)),
-        "val":           int(len(X_val)),
-        "test":          int(len(X_test)),
+        "train": int(len(X_train)),
+        "val": int(len(X_val)),
+        "test": int(len(X_test)),
         "class_balance": {
-            "train_healthy":   int(np.sum(y_train == 0)),
+            "train_healthy": int(np.sum(y_train == 0)),
             "train_unhealthy": int(np.sum(y_train == 1)),
         },
     }
     with open(out / "split_stats.json", "w") as f:
         json.dump(stats, f, indent=2)
 
-    print(f"\nSplit summary:")
+    print("\nSplit summary:")
     print(f"  Train : {stats['train']}  |  Val : {stats['val']}  |  Test : {stats['test']}")
     print(f"  Feature dim: {stats['feature_dim']}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--raw-dir",       default="data/raw")
+    parser.add_argument("--raw-dir", default="data/raw")
     parser.add_argument("--processed-dir", default="data/processed")
-    parser.add_argument("--params",        default="params.yaml")
+    parser.add_argument("--params", default="params.yaml")
     args = parser.parse_args()
     prepare(args.raw_dir, args.processed_dir, args.params)

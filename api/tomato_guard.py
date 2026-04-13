@@ -22,8 +22,8 @@ def load_params(path: str = "params.yaml") -> dict:
 class TomatoGuard:
     def __init__(self, params_path: str = "params.yaml"):
         p = load_params(params_path)
-        self.threshold    = p["tomato_guard"]["similarity_threshold"]
-        centroid_path     = p["tomato_guard"]["centroid_path"]
+        self.threshold = p["tomato_guard"]["similarity_threshold"]
+        centroid_path = p["tomato_guard"]["centroid_path"]
 
         if not Path(centroid_path).exists():
             raise FileNotFoundError(
@@ -58,6 +58,6 @@ class TomatoGuard:
         """
         Returns (is_tomato: bool, similarity_score: float).
         """
-        emb  = self.embed(image)
-        sim  = self.cosine_similarity(emb, self.centroid)
+        emb = self.embed(image)
+        sim = self.cosine_similarity(emb, self.centroid)
         return sim >= self.threshold, sim

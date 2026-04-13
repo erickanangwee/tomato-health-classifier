@@ -5,7 +5,7 @@ Loaded once at FastAPI startup; reused for every request.
 import joblib
 from pathlib import Path
 
-_model  = None
+_model = None
 _scaler = None
 
 

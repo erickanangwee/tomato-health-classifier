@@ -38,7 +38,7 @@ def client():
     mock_embedder.return_value = np.zeros((1, 1280), dtype=np.float32)
 
     with (
-        patch("api.main.get_model",  return_value=mock_model),
+        patch("api.main.get_model", return_value=mock_model),
         patch("api.main.get_scaler", return_value=mock_scaler),
         patch("api.main.TomatoGuard", return_value=mock_guard),
         patch("api.main.extract_features", mock_embedder),

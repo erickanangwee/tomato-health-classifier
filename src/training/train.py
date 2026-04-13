@@ -40,11 +40,11 @@ def load_params(path: str = "params.yaml") -> dict:
 def eval_metrics(model, X, y) -> dict:
     preds = model.predict(X)
     return {
-        "accuracy":  float(accuracy_score(y, preds)),
+        "accuracy": float(accuracy_score(y, preds)),
         "precision": float(precision_score(y, preds, average="weighted", zero_division=0)),
-        "recall":    float(recall_score(y, preds, average="weighted", zero_division=0)),
+        "recall": float(recall_score(y, preds, average="weighted", zero_division=0)),
         "f1_weighted": float(f1_score(y, preds, average="weighted", zero_division=0)),
-        "f1_binary":   float(f1_score(y, preds, average="binary", zero_division=0)),
+        "f1_binary": float(f1_score(y, preds, average="binary", zero_division=0)),
     }
 
 
@@ -54,8 +54,8 @@ def make_lr_objective(X_train, y_train, p, cv):
     lp = p["logistic_regression"]
 
     def objective(trial: optuna.Trial) -> float:
-        C        = trial.suggest_float("C", lp["C_low"], lp["C_high"], log=True)
-        solver   = trial.suggest_categorical("solver", lp["solver"])
+        C = trial.suggest_float("C", lp["C_low"], lp["C_high"], log=True)
+        solver = trial.suggest_categorical("solver", lp["solver"])
         model = LogisticRegression(
             C=C, solver=solver, max_iter=lp["max_iter"],
             class_weight="balanced", random_state=p["data"]["seed"]
@@ -72,15 +72,15 @@ def make_rf_objective(X_train, y_train, p, cv):
 
     def objective(trial: optuna.Trial) -> float:
         model = RandomForestClassifier(
-            n_estimators  = trial.suggest_int("n_estimators",
-                                               rp["n_estimators_low"],
-                                               rp["n_estimators_high"]),
-            max_depth      = trial.suggest_int("max_depth",
-                                               rp["max_depth_low"],
-                                               rp["max_depth_high"]),
-            min_samples_split = trial.suggest_int("min_samples_split",
-                                               rp["min_samples_split_low"],
-                                               rp["min_samples_split_high"]),
+            n_estimators=trial.suggest_int("n_estimators",
+                                           rp["n_estimators_low"],
+                                           rp["n_estimators_high"]),
+            max_depth=trial.suggest_int("max_depth",
+                                        rp["max_depth_low"],
+                                        rp["max_depth_high"]),
+            min_samples_split=trial.suggest_int("min_samples_split",
+                                                rp["min_samples_split_low"],
+                                                rp["min_samples_split_high"]),
             class_weight="balanced",
             random_state=p["data"]["seed"],
             n_jobs=-1,
@@ -97,21 +97,21 @@ def make_xgb_objective(X_train, y_train, p, cv):
 
     def objective(trial: optuna.Trial) -> float:
         model = XGBClassifier(
-            n_estimators   = trial.suggest_int("n_estimators",
-                                               xp["n_estimators_low"],
-                                               xp["n_estimators_high"]),
-            max_depth      = trial.suggest_int("max_depth",
-                                               xp["max_depth_low"],
-                                               xp["max_depth_high"]),
-            learning_rate  = trial.suggest_float("learning_rate",
-                                               xp["learning_rate_low"],
-                                               xp["learning_rate_high"], log=True),
-            subsample      = trial.suggest_float("subsample",
-                                               xp["subsample_low"],
-                                               xp["subsample_high"]),
-            eval_metric    = "logloss",
+            n_estimators=trial.suggest_int("n_estimators",
+                                           xp["n_estimators_low"],
+                                           xp["n_estimators_high"]),
+            max_depth=trial.suggest_int("max_depth",
+                                        xp["max_depth_low"],
+                                        xp["max_depth_high"]),
+            learning_rate=trial.suggest_float("learning_rate",
+                                              xp["learning_rate_low"],
+                                              xp["learning_rate_high"], log=True),
+            subsample=trial.suggest_float("subsample",
+                                          xp["subsample_low"],
+                                          xp["subsample_high"]),
+            eval_metric="logloss",
             use_label_encoder=False,
-            random_state   = p["data"]["seed"],
+            random_state=p["data"]["seed"],
             n_jobs=-1,
         )
         scores = cross_val_score(model, X_train, y_train,
@@ -128,13 +128,13 @@ def tune_and_log(
     build_fn,          # callable: best_params → fitted sklearn model
     objective_fn,
     X_train, y_train,
-    X_val,   y_val,
+    X_val, y_val,
     p: dict,
     output_dir: Path,
 ) -> dict:
     """Run Optuna study, log best trial to MLflow, save model artifact."""
-    op    = p["optuna"]
-    seed  = p["data"]["seed"]
+    op = p["optuna"]
+    seed = p["data"]["seed"]
 
     print(f"\n{'─'*60}")
     print(f"Tuning {model_name}  ({op['n_trials']} Optuna trials)...")
@@ -156,13 +156,13 @@ def tune_and_log(
     model.fit(X_train, y_train)
 
     train_metrics = eval_metrics(model, X_train, y_train)
-    val_metrics   = eval_metrics(model, X_val,   y_val)
+    val_metrics = eval_metrics(model, X_val, y_val)
 
     # ── Log to MLflow ───────────────────────────────────────────────────────
     with mlflow.start_run(run_name=model_name):
         mlflow.log_param("model_type", model_name)
         mlflow.log_params(best_params)
-        mlflow.log_metric("cv_f1_weighted",   best_cv_score)
+        mlflow.log_metric("cv_f1_weighted", best_cv_score)
         for k, v in train_metrics.items():
             mlflow.log_metric(f"train_{k}", v)
         for k, v in val_metrics.items():
@@ -191,12 +191,12 @@ def tune_and_log(
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--processed-dir", default="data/processed")
-    parser.add_argument("--output-dir",    default="models")
-    parser.add_argument("--params",        default="params.yaml")
+    parser.add_argument("--output-dir", default="models")
+    parser.add_argument("--params", default="params.yaml")
     args = parser.parse_args()
 
-    p   = load_params(args.params)
-    op  = p["optuna"]
+    p = load_params(args.params)
+    op = p["optuna"]
     out = Path(args.output_dir)
     prc = Path(args.processed_dir)
 
@@ -206,8 +206,8 @@ def main():
     # ── Load processed splits ───────────────────────────────────────────────
     X_train = np.load(prc / "X_train.npy")
     y_train = np.load(prc / "y_train.npy")
-    X_val   = np.load(prc / "X_val.npy")
-    y_val   = np.load(prc / "y_val.npy")
+    X_val = np.load(prc / "X_val.npy")
+    y_val = np.load(prc / "y_val.npy")
     print(f"Loaded  Train:{X_train.shape}  Val:{X_val.shape}")
 
     cv = StratifiedKFold(n_splits=op["cv_folds"], shuffle=True,

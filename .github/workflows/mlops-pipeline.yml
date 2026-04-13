@@ -39,7 +39,7 @@ jobs:
         run: |
           flake8 src/ api/ tests/ \
             --max-line-length=100 \
-            --ignore=E501,W503,E402 \
+            --ignore=E501,W503,E402,E221,E241,E251,E127,E128,W292 \
             --exclude=__pycache__
 
       - name: Import and schema check

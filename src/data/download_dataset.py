@@ -105,6 +105,6 @@ def download(output_dir: str, params_path: str = "params.yaml") -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--output-dir", default="data/raw")
-    parser.add_argument("--params",     default="params.yaml")
+    parser.add_argument("--params", default="params.yaml")
     args = parser.parse_args()
     download(args.output_dir, args.params)
