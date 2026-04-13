@@ -25,7 +25,7 @@ import numpy as np
 import joblib
 from pathlib import Path
 from sklearn.metrics import (
-    classification_report, confusion_matrix, f1_score
+    classification_report, f1_score
 )
 import mlflow
 
@@ -78,7 +78,7 @@ def evaluate(
     output_dir: str,
     params_path: str = "params.yaml",
 ):
-    p   = load_params(params_path)
+    p = load_params(params_path)
     out = Path(output_dir)
     prc = Path(processed_dir)
     mdir = Path(models_dir)
@@ -96,8 +96,8 @@ def evaluate(
     # ── Evaluate all models on test set ─────────────────────────────────────
     model_dirs = {
         "LogisticRegression": mdir / "logisticregression" / "best_model.joblib",
-        "RandomForest":       mdir / "randomforest"       / "best_model.joblib",
-        "XGBoost":            mdir / "xgboost"            / "best_model.joblib",
+        "RandomForest": mdir / "randomforest" / "best_model.joblib",
+        "XGBoost": mdir / "xgboost" / "best_model.joblib",
     }
 
     test_results = {}
@@ -107,7 +107,7 @@ def evaluate(
             continue
         model = joblib.load(weight_path)
         preds = model.predict(X_test)
-        f1    = f1_score(y_test, preds, average="weighted", zero_division=0)
+        f1 = f1_score(y_test, preds, average="weighted", zero_division=0)
         test_results[name] = {
             "f1_weighted": float(f1),
             "report": classification_report(y_test, preds,
@@ -175,11 +175,11 @@ def evaluate(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--models-dir",    default="models")
+    parser.add_argument("--models-dir", default="models")
     parser.add_argument("--processed-dir", default="data/processed")
-    parser.add_argument("--raw-dir",       default="data/raw")
-    parser.add_argument("--output-dir",    default="models/evaluation")
-    parser.add_argument("--params",        default="params.yaml")
+    parser.add_argument("--raw-dir", default="data/raw")
+    parser.add_argument("--output-dir", default="models/evaluation")
+    parser.add_argument("--params", default="params.yaml")
     args = parser.parse_args()
     evaluate(args.models_dir, args.processed_dir, args.raw_dir,
              args.output_dir, args.params)
